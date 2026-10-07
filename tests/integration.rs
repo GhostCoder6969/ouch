@@ -2384,6 +2384,43 @@ fn rename_flag_renames_incoming_zip_directory_aside() {
 }
 
 #[test]
+fn rename_flag_renames_incoming_sevenz_directory_aside() {
+    let (_tempdir, dir) = testdir().unwrap();
+
+    let clash_dir = dir.join("clash");
+    fs::create_dir_all(clash_dir.join("sub")).unwrap();
+    fs::write(clash_dir.join("file.txt"), "from archive").unwrap();
+    fs::write(clash_dir.join("sub").join("nested.txt"), "nested").unwrap();
+    let archive = dir.join("archive.7z");
+    ouch!("-A", "c", &clash_dir, &archive);
+
+    // Same setup as the tar and zip cases, the user's file must stay
+    // untouched and the whole incoming tree moves aside.
+    let work = dir.join("work");
+    fs::create_dir_all(&work).unwrap();
+    fs::write(work.join("clash"), "blocker").unwrap();
+
+    crate::utils::cargo_bin()
+        .current_dir(&work)
+        .arg("--rename")
+        .arg("decompress")
+        .arg("--here")
+        .arg(&archive)
+        .assert()
+        .success();
+
+    assert_eq!("blocker", fs::read_to_string(work.join("clash")).unwrap());
+    assert_eq!(
+        "from archive",
+        fs::read_to_string(work.join("clash_1").join("file.txt")).unwrap()
+    );
+    assert_eq!(
+        "nested",
+        fs::read_to_string(work.join("clash_1").join("sub").join("nested.txt")).unwrap()
+    );
+}
+
+#[test]
 fn rename_flag_still_asks_non_conflict_questions() {
     let (_tempdir, dir) = testdir().unwrap();
     fs::write(dir.join("file.txt"), "content").unwrap();
